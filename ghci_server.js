@@ -42,7 +42,15 @@ function GHCi() {
   }
 }
 
+var http = require('http'),
+    url  = require('url');
+
 ghci = GHCi();
-ghci.exec('3**7');
-ghci.exec('12*12');
-ghci.exec('hoge');
+
+http.createServer(function(req, res) {
+  if (req.method == 'GET') {
+    expr = url.parse(req.url, true).query.expr;
+    ghci.exec(expr);
+    res.end('{"hoge":"hoge"}');
+  }
+}).listen(11111)
