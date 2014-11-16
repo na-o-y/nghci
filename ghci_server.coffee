@@ -5,7 +5,7 @@ winston.remove(winston.transports.Console)
 winston.add(winston.transports.Console, { "timestamp": true })
 
 EXEC_CMD      = "docker"
-EXEC_ARGS     = ["run", "-it", '--net="none"', "haskell:latest", "ghci"]
+EXEC_ARGS     = ["run", "-i", '--net="none"', "haskell:latest", "ghci"]
 EXCLUDE_REGEX = [/\r/g, /\x1b(\[\?1[lh]|>|=)/g, /\:\{[\s\S]*?\:\}\s*\n/g, /Prelude\|\s/g]
 INITIAL_CMDS  = [":set +t\n"]
 
