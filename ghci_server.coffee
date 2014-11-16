@@ -6,7 +6,7 @@ winston.add(winston.transports.Console, { "timestamp": true })
 
 EXEC_CMD      = "docker"
 EXEC_ARGS     = ["run", "-i", '--net="none"', "haskell:latest", "ghci"]
-EXCLUDE_REGEX = [/\r/g, /\x1b(\[\?1[lh]|>|=)/g, /\:\{[\s\S]*?\:\}\s*\n/g, /Prelude\|\s/g]
+EXCLUDE_REGEX = [/Prelude\|\s/g]
 INITIAL_CMDS  = [":set +t\n"]
 
 class GHCiCore
@@ -26,6 +26,10 @@ class GHCiCore
     @ghci_process.stdout.on "data", processChunk
     @ghci_process.stderr.on "data", processChunk
     @ghci_process.on "exit", =>
+      winston.info "process killed."
+      if @status is "run"
+        @onFinish "process killed."
+        @onFinish = null
       @initProcess()
 
   constructor: (@onReady) ->
@@ -45,11 +49,6 @@ class GHCiCore
           @onFinish = null
           @status = "ready"
         @onReady()
-      if (@buf.match /Leaving\sGHCi/g) and (@status is "run")
-        @onFinish "process killed."
-        @onFinish = null
-        @status = "ready"
-        @onReady()
     ), 100
 
   eval: (expr, @onFinish) =>
@@ -57,6 +56,8 @@ class GHCiCore
     winston.info "eval: #{expr}"
     @buf = ""
     @status = "run"
+    # workaround
+    @ghci_process.kill("SIGKILL") if expr.match /\:q/g
     @ghci_process.stdin.write ":{\n#{expr}\n:}\n"
 
 class GHCi
