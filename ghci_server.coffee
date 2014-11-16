@@ -57,7 +57,9 @@ class GHCiCore
     @buf = ""
     @status = "run"
     # workaround
-    @ghci_process.kill("SIGKILL") if expr.match /\:q/g
+    if expr.match /\:q/g
+      @ghci_process.kill("SIGKILL")
+      return
     @ghci_process.stdin.write ":{\n#{expr}\n:}\n"
 
 class GHCi
