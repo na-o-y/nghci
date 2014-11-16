@@ -5,7 +5,7 @@ EXEC_LIMIT_MS = 500
 EXEC_CMD      = "docker"
 EXEC_ARGS     = ["run", "-it", '--net="none"', "haskell:latest", "ghci"]
 SKIP_LINES    = 4 # ignoring beginning lines of ghci
-EXCLUDE_REGEX = [/Prelude(>|\|)\s/g, /\:\{[\s\S]*\:\}\s*\n/g]
+EXCLUDE_REGEX = [/Prelude(>|\|)\s/g, /\:\{[\s\S]*\:\}\s*\n/g, /\x1b(\[\?1[lh]|>|=)/g]
 INITIAL_CMDS  = [":set +t\n"]
 
 class GHCiCore
