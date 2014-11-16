@@ -4,12 +4,10 @@ winston = require "winston"
 winston.remove(winston.transports.Console)
 winston.add(winston.transports.Console, { "timestamp": true })
 
-EXEC_LIMIT_MS = 500
 EXEC_CMD      = "docker"
-EXEC_ARGS     = ["run", "-it", '--net="none"', "haskell:latest", "ghci"]
-EXCLUDE_REGEX = [/\:\{[\s\S]*\:\}\s*\n/g, /\x1b(\[\?1[lh]|>|=)/g]
-INITIAL_CMDS  = [":set +t\n", ":set prompt \"\"\n", ":set prompt2 \"\"\n"]
-LOADING_MS    = 5000
+EXEC_ARGS     = ["run", "-i", '--net="none"', "haskell:latest", "ghci"]
+EXCLUDE_REGEX = [/\:\{[\s\S]*?\:\}\s*\n/g, /Prelude\|\s/g]
+INITIAL_CMDS  = [":set +t\n"]
 
 class GHCiCore
   initProcess: =>
@@ -17,13 +15,11 @@ class GHCiCore
     @status   = "load"
     @buf      = ""
     @onFinish = null
-    @last_chunk_received = Date.now()
 
     @ghci_process = spawn EXEC_CMD, EXEC_ARGS
     @ghci_process.stdin.write cmd for cmd in INITIAL_CMDS
 
     processChunk = (chunk) =>
-      @last_chunk_received = Date.now()
       @buf += chunk
       @buf = @buf.replace reg, "" for reg in EXCLUDE_REGEX
 
@@ -38,15 +34,17 @@ class GHCiCore
 
     # check if load/eval finished every 100ms
     setInterval (=>
-      if @status is "load" and @buf.length and Date.now() - @last_chunk_received > LOADING_MS
-        @buf = ""
-        @status = "ready"
-        @onReady()
-      else if @status is "run" and @buf.length and Date.now() - @last_chunk_received > EXEC_LIMIT_MS
-        winston.info "finish: #{@buf}"
-        @onFinish @buf
-        @onFinish = null
-        @status = "ready"
+      lines = @buf.split("\n")
+      if lines.pop().match /Prelude\>\s$/
+        if @status is "load"
+          winston.info "process is ready"
+          @buf = ""
+          @status = "ready"
+        if @status is "run"
+          winston.info "finish: #{@buf}"
+          @onFinish lines.join("\n") if @onFinish
+          @onFinish = null
+          @status = "ready"
         @onReady()
     ), 100
 
