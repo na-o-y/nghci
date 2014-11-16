@@ -1,16 +1,20 @@
-spawn = require("child_process").spawn
+spawn   = require("child_process").spawn
 express = require "express"
+winston = require "winston"
+winston.remove(winston.transports.Console)
+winston.add(winston.transports.Console, { "timestamp": true })
 
 EXEC_LIMIT_MS = 500
 EXEC_CMD      = "docker"
 EXEC_ARGS     = ["run", "-it", '--net="none"', "haskell:latest", "ghci"]
-SKIP_LINES    = 4 # ignoring beginning lines of ghci
-EXCLUDE_REGEX = [/Prelude(>|\|)\s/g, /\:\{[\s\S]*\:\}\s*\n/g, /\x1b(\[\?1[lh]|>|=)/g]
-INITIAL_CMDS  = [":set +t\n"]
+EXCLUDE_REGEX = [/\:\{[\s\S]*\:\}\s*\n/g, /\x1b(\[\?1[lh]|>|=)/g]
+INITIAL_CMDS  = [":set +t\n", ":set prompt \"\"\n", ":set prompt2 \"\"\n"]
+LOADING_MS    = 5000
 
 class GHCiCore
   initProcess: =>
-    @status   = "ready"
+    winston.info "init process"
+    @status   = "load"
     @buf      = ""
     @onFinish = null
     @last_chunk_received = Date.now()
@@ -18,16 +22,10 @@ class GHCiCore
     @ghci_process = spawn EXEC_CMD, EXEC_ARGS
     @ghci_process.stdin.write cmd for cmd in INITIAL_CMDS
 
-    skip_lines = SKIP_LINES
     processChunk = (chunk) =>
-      chunk = chunk.toString()
-      while (skip_lines and (pos = chunk.indexOf("\n")) != -1)
-        skip_lines -= 1
-        chunk = chunk.slice(pos+1)
-      if skip_lines == 0 and chunk != ""
-        @last_chunk_received = Date.now()
-        @buf += chunk
-        @buf = @buf.replace reg, "" for reg in EXCLUDE_REGEX
+      @last_chunk_received = Date.now()
+      @buf += chunk
+      @buf = @buf.replace reg, "" for reg in EXCLUDE_REGEX
 
     @ghci_process.stdout.on "data", processChunk
     @ghci_process.stderr.on "data", processChunk
@@ -38,9 +36,14 @@ class GHCiCore
   constructor: (@onReady) ->
     @initProcess()
 
-    # check if eval finished every 100ms
+    # check if load/eval finished every 100ms
     setInterval (=>
-      if @status is "run" and @buf.length and Date.now() - @last_chunk_received > EXEC_LIMIT_MS
+      if @status is "load" and @buf.length and Date.now() - @last_chunk_received > LOADING_MS
+        @buf = ""
+        @status = "ready"
+        @onReady()
+      else if @status is "run" and @buf.length and Date.now() - @last_chunk_received > EXEC_LIMIT_MS
+        winston.info "finish: #{@buf}"
         @onFinish @buf
         @onFinish = null
         @status = "ready"
@@ -49,15 +52,16 @@ class GHCiCore
 
   eval: (expr, @onFinish) =>
     throw "another one is running" if @status isnt "ready"
+    winston.info "eval: #{expr}"
     @buf = ""
     @status = "run"
     @ghci_process.stdin.write ":{\n#{expr}\n:}\n"
 
 class GHCi
   constructor: ->
+    @wait_queue = []
     @core = new GHCiCore =>
       @core.eval @wait_queue.shift()... if @wait_queue.length # onReady
-    @wait_queue = []
 
   eval: (expr, out) =>
     if @core.status is "ready"
