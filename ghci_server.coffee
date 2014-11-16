@@ -2,18 +2,21 @@ spawn = require("child_process").spawn
 express = require "express"
 
 EXEC_LIMIT_MS = 500
-GHCI_CMD      = "ghci"
+EXEC_CMD      = "docker"
+EXEC_ARGS     = ["run", "-it", '--net="none"', "haskell:latest", "ghci"]
 SKIP_LINES    = 4 # ignoring beginning lines of ghci
+EXCLUDE_REGEX = [/Prelude(>|\|)\s/g, /\:\{[\s\S]*\:\}\s*\n/g]
+INITIAL_CMDS  = [":set +t\n"]
 
 class GHCiCore
-  init_process: =>
+  initProcess: =>
     @status   = "ready"
     @buf      = ""
     @onFinish = null
     @last_chunk_received = Date.now()
 
-    @ghci_process = spawn(GHCI_CMD)
-    @ghci_process.stdin.write ":set +t\n"
+    @ghci_process = spawn EXEC_CMD, EXEC_ARGS
+    @ghci_process.stdin.write cmd for cmd in INITIAL_CMDS
 
     skip_lines = SKIP_LINES
     processChunk = (chunk) =>
@@ -24,16 +27,16 @@ class GHCiCore
       if skip_lines == 0 and chunk != ""
         @last_chunk_received = Date.now()
         @buf += chunk
-        @buf = @buf.replace(/Prelude(>|\|)\s/g, "")
+        @buf = @buf.replace reg, "" for reg in EXCLUDE_REGEX
 
     @ghci_process.stdout.on "data", processChunk
     @ghci_process.stderr.on "data", processChunk
     @ghci_process.on "exit", =>
       @onFinish "process killed." if @onFinish
-      @init_process()
+      @initProcess()
 
   constructor: (@onReady) ->
-    @init_process()
+    @initProcess()
 
     # check if eval finished every 100ms
     setInterval (=>
