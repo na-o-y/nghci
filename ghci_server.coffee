@@ -26,7 +26,6 @@ class GHCiCore
     @ghci_process.stdout.on "data", processChunk
     @ghci_process.stderr.on "data", processChunk
     @ghci_process.on "exit", =>
-      @onFinish "process killed." if @onFinish
       @initProcess()
 
   constructor: (@onReady) ->
@@ -45,6 +44,11 @@ class GHCiCore
           @onFinish lines.join("\n") if @onFinish
           @onFinish = null
           @status = "ready"
+        @onReady()
+      if (@buf.match /Leaving\sGHCi/g) and (@status is "run")
+        @onFinish "process killed."
+        @onFinish = null
+        @status = "ready"
         @onReady()
     ), 100
 
