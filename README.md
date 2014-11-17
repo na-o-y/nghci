@@ -13,3 +13,9 @@ $ npm install
 $ npm install -g coffee-script
 $ coffee ghci_server.coffee
 ```
+
+# API
+
+```
+GET /eval?expr=[PARAM]
+```
