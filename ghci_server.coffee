@@ -41,13 +41,12 @@ class GHCiCore
       if lines.pop().match /Prelude\>\s$/
         if @status is "load"
           winston.info "process is ready"
-          @buf = ""
-          @status = "ready"
         if @status is "run"
-          winston.info "finish: #{@buf}"
+          winston.info "eval finish: #{@buf}"
           @onFinish lines.join("\n") if @onFinish
           @onFinish = null
-          @status = "ready"
+        @buf = ""
+        @status = "ready"
         @onReady()
     ), 100
 
