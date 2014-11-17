@@ -6,7 +6,7 @@ Backend processes of GHCi run on secure Docker container.
 
 # Installation
 
-Please make sure that Docker and appropriate Docker image (haskell:latest) is installed.
+Please make sure that Docker and appropriate Docker image (haskell:latest) are installed.
 
 ```
 $ npm install
