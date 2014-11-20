@@ -37,7 +37,7 @@ class GHCiCore
 
     # check if load/eval finished every 100ms
     setInterval (=>
-      lines = @buf.split("\n")
+      lines = @buf.split "\n"
       if lines.pop().match /Prelude\>\s$/
         if @status is "load"
           winston.info "process is ready"
@@ -57,9 +57,13 @@ class GHCiCore
     @status = "run"
     # workaround
     if expr.match /\:q/g
-      @ghci_process.kill("SIGKILL")
+      @ghci_process.kill "SIGKILL"
       return
     @ghci_process.stdin.write ":{\n#{expr}\n:}\n"
+
+  refresh: (onSuccess) =>
+    @ghci_process.kill "SIGKILL"
+    onSuccess()
 
 class GHCi
   constructor: ->
@@ -74,9 +78,15 @@ class GHCi
     else
       @wait_queue.push [expr, out]
 
+  refresh: (onSuccess) =>
+    winston.info "refresh"
+    @core.refresh onSuccess
+
 ghci = new GHCi()
 app = express()
 app.get "/eval", (req, res) ->
   ghci.eval req.query.expr, ((result) -> res.send(result))
+app.get "/refresh", (req, res) ->
+  ghci.refresh -> (res.send "refresh done.")
 
 app.listen 3000
